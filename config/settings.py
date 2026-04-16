@@ -22,9 +22,9 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "app",
-
-    'import_export',
 ]
+
+AUTH_USER_MODEL = 'app.User'
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -90,3 +90,6 @@ USE_TZ = True
 
 
 STATIC_URL = "static/"
+
+
+AUTH_USER_MODEL = 'app.User'
