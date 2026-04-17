@@ -9,8 +9,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv("SECRET_KEY", "hello-beby-there-is-not-your-home")
 
-DEBUG = os.getenv("DEBUG", None) == "False"
-
+# DEBUG = os.getenv("DEBUG", None) == "False"
+DEBUG = True
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "*").split(",")
 
 
@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "app",
+    'import_export',
     "bot",
 ]
 

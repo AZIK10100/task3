@@ -1,7 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 
-
 class StatusChoices(models.TextChoices):
     ("active", "Active"),
     ("blocked", "Blocked"),
@@ -11,7 +10,7 @@ class StatusChoices(models.TextChoices):
 class Card(models.Model):
     card_number = models.CharField(max_length=16, unique=True)
     phone = models.CharField(max_length=13)
-    balance = models.DecimalField(max_digits=10, decimal_places=2)
+    balance = models.DecimalField(max_digits=15, decimal_places=2)
     status = models.CharField(max_length=10, choices=StatusChoices.choices)
     expire_date = models.DateField()
 
