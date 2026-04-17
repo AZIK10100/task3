@@ -22,8 +22,10 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "app",
-  
+    "bot",
 ]
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 AUTH_USER_MODEL = 'app.User'
 
