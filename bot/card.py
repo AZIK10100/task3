@@ -9,6 +9,7 @@ from aiogram.fsm.context import FSMContext
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from asgiref.sync import sync_to_async
+from .utils import menu_builders
 
 card_router = Router()
 
@@ -75,8 +76,10 @@ async def expire_date_handler(message: types.Message, state: FSMContext):
     except:
         await message.answer("Kutilmagan xatolik")
         return
-
-    await message.answer(f"{card} muvofaqiyatli qoshildi.")
+    builders = menu_builders()
+    await message.answer(
+        f"{card} muvofaqiyatli qoshildi.", reply_markup=builders.as_markup()
+    )
     await state.clear()
 
 
@@ -97,6 +100,8 @@ async def card_list_handler(callback: types.CallbackQuery):
     )
 
     cards = [uc.card.card_number for uc in user_cards]
-
-    await message.answer("Sizning Kartalaringiz:\n \n".join(cards))
+    builders = menu_builders()
+    await message.answer(
+        "Sizning Kartalaringiz:\n \n".join(cards), reply_markup=builders.as_markup()
+    )
     await callback.answer("")

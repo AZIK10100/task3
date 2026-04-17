@@ -5,6 +5,7 @@ from aiogram import types, F, Router
 from aiogram.fsm.context import FSMContext
 from app.models import User
 from asgiref.sync import sync_to_async
+from .utils import menu_builders
 
 login_router = Router()
 
@@ -86,13 +87,7 @@ async def send_contact_handler(message: types.Message, state: FSMContext):
         )
         await state.clear()
 
-        builder = InlineKeyboardBuilder()
-        builder.row(
-            types.InlineKeyboardButton(text="Karta qoshish", callback_data="add_card"),
-        )
-        builder.row(
-            types.InlineKeyboardButton(text="Kartalarim", callback_data="card_list"),
-        )
+        builder = menu_builders()
 
         await message.answer(
             "O'zingizga kerakli bo'limni tanlang.", reply_markup=builder.as_markup()
