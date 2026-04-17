@@ -13,3 +13,14 @@ class CardResource(resources.ModelResource):
 @admin.register(Card)
 class CardAdmin(ExportMixin, admin.ModelAdmin):
     resource_class = CardResource
+    def formated_card(self, obj):
+        # 8600 0000 0000 0000 shu kabi format qilib berish uchun
+        return f"{obj.card_number[:4]} {obj.card_number[4:8]} {obj.card_number[8:12]} {obj.card_number[12:]}"
+    
+    def formated_phone(self, obj):
+        # +998 90 123 45 67 shu kabi format qilib berish uchun
+        return f"{obj.phone[:4]} {obj.phone[4:6]} {obj.phone[6:9]} {obj.phone[9:11]} {obj.phone[11:13]}"
+
+    # bular yuqorida adminda ko'rinishi uchun
+    formated_card.short_description = "Card Number"
+    formated_phone.short_description = "Phone Number"
