@@ -10,6 +10,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from asgiref.sync import sync_to_async
 from .utils import menu_builders
+from app.utils import card_mask_spoiler
 
 card_router = Router()
 
@@ -33,6 +34,7 @@ async def add_card(message: types.Message, state: FSMContext):
     if not len(clean_card) == 16:
         await message.answer("Iltimos 16 xonali son yuboring:")
         return
+
     else:
         await state.update_data(card_number=clean_card)
         await state.set_state(AddCardStateGroup.expire_date)
@@ -99,9 +101,10 @@ async def card_list_handler(callback: types.CallbackQuery):
         UserCard.objects.filter(user=user).select_related("card")
     )
 
-    cards = [uc.card.card_number for uc in user_cards]
+    cards = [card_mask_spoiler(uc.card.card_number) for uc in user_cards]
     builders = menu_builders()
     await message.answer(
-        "Sizning Kartalaringiz:\n \n".join(cards), reply_markup=builders.as_markup()
+        "Sizning Kartalaringiz:\n \n".join(cards), reply_markup=builders.as_markup(), parse_mode="HTML"
+
     )
     await callback.answer("")
