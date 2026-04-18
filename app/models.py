@@ -1,17 +1,22 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from decimal import Decimal
 
 
 class StatusChoices(models.TextChoices):
-    ("active", "Active"),
-    ("blocked", "Blocked"),
-    ("expired", "Expired"),
+    ACTIVE = "active", "Active"
+    BLOCKED = "blocked", "Blocked"
+    EXPIRED = "expired", "Expired"
 
 
 class Card(models.Model):
     card_number = models.CharField(max_length=16, unique=True)
     phone = models.CharField(max_length=13)
-    balance = models.DecimalField(max_digits=10, decimal_places=2)
+    balance = models.DecimalField(
+        max_digits=20,   # 🔥 kattaroq qil
+        decimal_places=2,
+        default=Decimal("0.00")
+    )
     status = models.CharField(max_length=10, choices=StatusChoices.choices)
     expire_date = models.DateField()
 
@@ -33,7 +38,11 @@ class User(AbstractUser):
 
 class UserCard(models.Model):
     user = models.ForeignKey(User, related_name="cards", on_delete=models.CASCADE)
-    card = models.ForeignKey(Card,  on_delete=models.CASCADE, related_name="userscard",)
+    card = models.ForeignKey(
+        Card,
+        on_delete=models.CASCADE,
+        related_name="userscard",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
