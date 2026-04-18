@@ -4,7 +4,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from asgiref.sync import sync_to_async
 from app.models import User, Card, UserCard
-from app.utils import clean_card_number
+from app.utils import clean_card_number, card_mask_spoiler, card_mask
 
 transaction_router = Router()
 
@@ -36,7 +36,9 @@ async def select_cart_for_deposit_handler(
         return
     builder = InlineKeyboardBuilder()
     for card in cards_list:
-        builder.row(types.InlineKeyboardButton(text=card, callback_data=card))
+        builder.row(
+            types.InlineKeyboardButton(text=card_mask(card), callback_data=card)
+        )
     await state.set_state(DepositStateGroup.select_cart)
     await callback.message.answer(
         text="Toldirmoqchi bolgan kartanigzni tanlang", reply_markup=builder.as_markup()
@@ -69,16 +71,16 @@ async def deposit_handler(message: types.Message, state: FSMContext):
         f"{card_number} kartasi {deposit_sum}so'm ga to'ldirildi. Xisobingiz {cart.balance}so'm"
     )
 
+
 class TransactionStateGroup(StatesGroup):
     select_cart = State()
     third_cart = State()
     quantity = State()
-    
+
+
 @transaction_router.callback_query(F.data == "transfer")
 async def select_cart_handler(callback: types.CallbackQuery, state: FSMContext):
-    user = await sync_to_async(User.objects.get)(
-        telegram_id=callback.from_user.id
-    )
+    user = await sync_to_async(User.objects.get)(telegram_id=callback.from_user.id)
 
     cards = await sync_to_async(list)(
         user.cards.values_list("card__card_number", flat=True)
@@ -92,13 +94,14 @@ async def select_cart_handler(callback: types.CallbackQuery, state: FSMContext):
     builder = InlineKeyboardBuilder()
     for card in cards:
         builder.row(
-            types.InlineKeyboardButton(text=card, callback_data=card)
+            types.InlineKeyboardButton(text=card_mask(card), callback_data=card)
         )
 
     await state.set_state(TransactionStateGroup.select_cart)
     await callback.message.answer("Kartani tanlang:", reply_markup=builder.as_markup())
     await callback.answer()
-    
+
+
 @transaction_router.callback_query(TransactionStateGroup.select_cart)
 async def get_sender_card(callback: types.CallbackQuery, state: FSMContext):
     await state.update_data(cart=callback.data)
@@ -106,7 +109,8 @@ async def get_sender_card(callback: types.CallbackQuery, state: FSMContext):
 
     await callback.message.answer("Qabul qiluvchi karta raqamini kiriting:")
     await callback.answer()
-    
+
+
 @transaction_router.message(TransactionStateGroup.third_cart)
 async def get_receiver_card(message: types.Message, state: FSMContext):
     clean_cart = clean_card_number(message.text)
@@ -121,7 +125,8 @@ async def get_receiver_card(message: types.Message, state: FSMContext):
     await state.set_state(TransactionStateGroup.quantity)
 
     await message.answer("Summani kiriting:")
-    
+
+
 @transaction_router.message(TransactionStateGroup.quantity)
 async def process_transfer(message: types.Message, state: FSMContext):
     data = await state.get_data()
@@ -156,9 +161,9 @@ async def process_transfer(message: types.Message, state: FSMContext):
     await sync_to_async(sender_card.save)()
     await sync_to_async(receiver_card.save)()
 
-    receiver_user_card = await sync_to_async(UserCard.objects.select_related("user").get)(
-        card=receiver_card
-    )
+    receiver_user_card = await sync_to_async(
+        UserCard.objects.select_related("user").get
+    )(card=receiver_card)
 
     receiver_user = receiver_user_card.user
 
@@ -166,11 +171,13 @@ async def process_transfer(message: types.Message, state: FSMContext):
         await message.bot.send_message(
             chat_id=receiver_user.telegram_id,
             text=f"Sizning kartangizga {amount} so‘m tushdi.\n"
-                 f"Karta: {receiver_card.card_number}"
+            f"Karta: {card_mask_spoiler(receiver_card.card_number)}",
+            parse_mode="HTML",
         )
 
     await message.answer(
-        f"{amount} so‘m yuborildi\n{sender} → {receiver}"
+        f"{amount} so‘m yuborildi\n{card_mask_spoiler(sender)} → {card_mask_spoiler(receiver)}",
+        parse_mode="HTML",
     )
 
     await state.clear()
