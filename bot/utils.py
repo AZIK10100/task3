@@ -1,5 +1,6 @@
-from aiogram.utils.keyboard import  InlineKeyboardBuilder
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram import types
+
 
 def menu_builders():
     builder = InlineKeyboardBuilder()
@@ -8,5 +9,11 @@ def menu_builders():
     )
     builder.row(
         types.InlineKeyboardButton(text="Kartalarim", callback_data="card_list"),
+    )
+    builder.row(
+        types.InlineKeyboardButton(text="Kartani toldirish", callback_data="deposit"),
+    )
+    builder.row(
+        types.InlineKeyboardButton(text="Pul yuborish", callback_data="transfer"),
     )
     return builder

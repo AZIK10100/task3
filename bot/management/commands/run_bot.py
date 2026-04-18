@@ -6,7 +6,7 @@ from django.conf import settings
 from aiogram import Bot, Dispatcher
 from bot.login import login_router
 from bot.card import card_router
-
+from bot.transaction import transaction_router  
 class Command(BaseCommand):
     help = "Telegram botni ishga tushirish"
 
@@ -15,7 +15,7 @@ class Command(BaseCommand):
             bot = Bot(token=settings.BOT_TOKEN)
             dp = Dispatcher()
 
-            dp.include_routers(login_router, card_router)
+            dp.include_routers(login_router, card_router, transaction_router)
 
             self.stdout.write(self.style.SUCCESS("Bot ishga tushdi..."))
             await dp.start_polling(bot)

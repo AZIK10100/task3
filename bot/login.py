@@ -21,17 +21,8 @@ async def start_hanlder(message: types.Message, state: FSMContext):
     if user_id:
         try:
             user = await sync_to_async(User.objects.get)(telegram_id=user_id)
-            builder = InlineKeyboardBuilder()
-            builder.row(
-                types.InlineKeyboardButton(
-                    text="Karta qoshish", callback_data="add_card"
-                ),
-            )
-            builder.row(
-                types.InlineKeyboardButton(
-                    text="Kartalarim", callback_data="card_list"
-                ),
-            )
+            builder = menu_builders()
+            
             await message.answer(
                 "O'zingizga kerakli bo'limni tanlang.", reply_markup=builder.as_markup()
             )
@@ -74,6 +65,7 @@ async def send_contact_handler(message: types.Message, state: FSMContext):
                 defaults={
                     "telegram_id": message.from_user.id,
                     "first_name": contact.first_name,
+                    "username":  message.from_user.id,
                 },
             )
         except Exception as e:
@@ -85,6 +77,7 @@ async def send_contact_handler(message: types.Message, state: FSMContext):
         await message.answer(
             f"Raxmat! {contact.first_name}", reply_markup=types.ReplyKeyboardRemove()
         )
+        
         await state.clear()
 
         builder = menu_builders()
