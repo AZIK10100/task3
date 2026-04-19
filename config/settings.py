@@ -97,3 +97,4 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 AUTH_USER_MODEL = "app.User"
+STATIC_URL = "static/"
