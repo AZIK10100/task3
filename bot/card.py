@@ -10,7 +10,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from asgiref.sync import sync_to_async
 from .utils import menu_builders
-from app.utils import card_mask_spoiler
+from app.utils import card_mask_spoiler, check_card_by_luhn
 
 card_router = Router()
 
@@ -34,6 +34,13 @@ async def add_card(message: types.Message, state: FSMContext):
     if not len(clean_card) == 16:
         await message.answer("Iltimos 16 xonali son yuboring:")
         return
+        
+    verify_by_luhn = check_card_by_luhn(clean_card)
+
+    if not verify_by_luhn:
+        await message.answer("Notog'ri karta")
+        return 
+        
 
     else:
         await state.update_data(card_number=clean_card)
