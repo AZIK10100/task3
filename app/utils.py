@@ -159,3 +159,55 @@ def check_card_by_luhn(card_number):
     total = sum(dublicated_evens)
 
     return total % 10 == 0
+
+
+def calculate_exchange(amount, from_currency, to_currency):
+    """
+    Currency convert function
+
+    Supported:
+    840 = USD
+    643 = RUB
+    860 = UZS
+    
+    Args:
+        amount: The amount to convert
+        from_currency: Source currency code (840, 643, or 860)
+        to_currency: Target currency code (840, 643, or 860)
+        
+    Returns:
+        Converted amount in the target currency
+    """
+    
+    # Validate input
+    if amount is None or (isinstance(amount, (int, float)) and amount < 0):
+        raise ValueError("Amount must be a positive number")
+    
+    USD_RATE = 12500   # 1 USD = 12500 UZS
+    RUB_RATE = 150     # 1 RUB = 150 UZS
+
+    # 1️⃣ Hammasini UZS ga o'tkazamiz
+    if from_currency == 840:  # USD → UZS
+        amount_in_uzs = amount * USD_RATE
+
+    elif from_currency == 643:  # RUB → UZS
+        amount_in_uzs = amount * RUB_RATE
+
+    elif from_currency == 860:  # UZS → UZS
+        amount_in_uzs = amount
+
+    else:
+        raise ValueError(f"Unsupported from_currency: {from_currency}")
+
+    # 2️⃣ UZS dan kerakli valyutaga o'tkazamiz
+    if to_currency == 840:  # UZS → USD
+        return amount_in_uzs / USD_RATE
+
+    elif to_currency == 643:  # UZS → RUB
+        return amount_in_uzs / RUB_RATE
+
+    elif to_currency == 860:  # UZS → UZS
+        return amount_in_uzs
+
+    else:
+        raise ValueError(f"Unsupported to_currency: {to_currency}")
