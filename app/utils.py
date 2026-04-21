@@ -160,7 +160,6 @@ def check_card_by_luhn(card_number):
 
     return total % 10 == 0
 
-
 def calculate_exchange(amount, from_currency, to_currency):
     """
     Currency convert function
