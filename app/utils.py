@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-
+import requests
 
 def format_card(raw_card) -> str:
     if not raw_card:
@@ -160,53 +160,66 @@ def check_card_by_luhn(card_number):
 
     return total % 10 == 0
 
-def calculate_exchange(amount, from_currency, to_currency):
-    """
-    Currency convert function
 
-    Supported:
-    840 = USD
-    643 = RUB
-    860 = UZS
-    
-    Args:
-        amount: The amount to convert
-        from_currency: Source currency code (840, 643, or 860)
-        to_currency: Target currency code (840, 643, or 860)
-        
-    Returns:
-        Converted amount in the target currency
-    """
-    
-    # Validate input
-    if amount is None or (isinstance(amount, (int, float)) and amount < 0):
-        raise ValueError("Amount must be a positive number")
-    
-    USD_RATE = 12500   # 1 USD = 12500 UZS
-    RUB_RATE = 150     # 1 RUB = 150 UZS
+USD = 840
+RUB = 643
+UZS = 860
 
-    # 1️⃣ Hammasini UZS ga o'tkazamiz
-    if from_currency == 840:  # USD → UZS
-        amount_in_uzs = amount * USD_RATE
+ALLOWED = {USD, RUB, UZS}
+ERROR_CODE = 32707
 
-    elif from_currency == 643:  # RUB → UZS
-        amount_in_uzs = amount * RUB_RATE
 
-    elif from_currency == 860:  # UZS → UZS
-        amount_in_uzs = amount
+def get_rates():
+    url = "https://cbu.uz/uz/arkhiv-kursov-valyut/json/"
+    response = requests.get(url)
 
+    if response.status_code != 200:
+        raise Exception("API ishlamayapti")
+
+    data = response.json()
+
+    rates = {UZS: 1}
+
+    for item in data:
+        if item['Ccy'] == "USD":
+            rates[USD] = float(item['Rate'])
+        elif item['Ccy'] == "RUB":
+            rates[RUB] = float(item['Rate'])
+
+    return rates
+
+
+def currency_error(lang="uz"):
+    if lang == "ru":
+        return {"code": ERROR_CODE, "message": "Разрешены только валюты 860, 643, 840"}
+    elif lang == "en":
+        return {"code": ERROR_CODE, "message": "Currency not allowed except 860, 643, 840"}
     else:
-        raise ValueError(f"Unsupported from_currency: {from_currency}")
+        return {"code": ERROR_CODE, "message": "Faqat 860, 643, 840 valyutalari ruxsat etilgan"}
 
-    # 2️⃣ UZS dan kerakli valyutaga o'tkazamiz
-    if to_currency == 840:  # UZS → USD
-        return amount_in_uzs / USD_RATE
 
-    elif to_currency == 643:  # UZS → RUB
-        return amount_in_uzs / RUB_RATE
+def convert(amount, from_currency, to_currency, lang="uz"):
+    """
+    UZS ↔ USD ↔ RUB universal converter
+    """
 
-    elif to_currency == 860:  # UZS → UZS
-        return amount_in_uzs
+    # ❌ validation
+    if amount is None or amount <= 0:
+        raise ValueError("Amount must be positive")
 
-    else:
-        raise ValueError(f"Unsupported to_currency: {to_currency}")
+    if from_currency not in ALLOWED or to_currency not in ALLOWED:
+        return currency_error(lang)
+
+    rates = get_rates()
+
+    # 🔁 UZS ga o'tkazish
+    amount_in_uzs = amount * rates[from_currency]
+
+    # 🔁 target currency
+    result = amount_in_uzs / rates[to_currency]
+
+    return {
+        "amount": round(result, 2),
+        "from": from_currency,
+        "to": to_currency
+    }
