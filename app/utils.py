@@ -2,6 +2,7 @@ import re
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 import requests
+import random
 
 def format_card(raw_card) -> str:
     if not raw_card:
@@ -223,3 +224,8 @@ def convert(amount, from_currency, to_currency, lang="uz"):
         "from": from_currency,
         "to": to_currency
     }
+
+
+
+def generate_otp(length=6):
+    return "".join(str(random.randint(0, 9)) for _ in range(length))
