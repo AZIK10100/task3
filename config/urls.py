@@ -16,7 +16,9 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from app.views import rpc_endpoint
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('rpc/', rpc_endpoint, name='rpc-endpoint'),
 ]

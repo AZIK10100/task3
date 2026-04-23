@@ -1,13 +1,15 @@
+import json
+
 from django.shortcuts import redirect
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
+from django.http import HttpResponse, JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from jsonrpcserver import dispatch
 
 from .models import Card
 from .utils import format_card, format_phone, parse_expire, clean_balance
-
-
-from jsonrpcserver import method, result, Success, Error as RPCError
-from .models import Tra
+from . import rpc
 
 try:
     import openpyxl
@@ -97,16 +99,45 @@ def import_cards_view(request):
     return redirect("/admin/app/card/")
 
 
-@method(name="transfer.create")
-def transfer_create(
-    ext_id,
-    sender_card_number,
-    sender_card_expire,
-    reciver_card_number,
-    sending_amount,
-    currency,
-):
+def build_jsonrpc_error(code, message, request_id=None):
+    return {
+        "jsonrpc": "2.0",
+        "error": {"code": code, "message": message},
+        "id": request_id,
+    }
+
+
+@csrf_exempt
+def rpc_endpoint(request):
+    if request.method != "POST":
+        return JsonResponse(
+            build_jsonrpc_error(32713, rpc.get_error_message(32713)),
+            status=405,
+        )
+
+    payload_text = request.body.decode("utf-8")
+
     try:
-        pass
-    except:
-        pass
+        payload = json.loads(payload_text)
+    except json.JSONDecodeError:
+        response = dispatch(payload_text, validator=lambda _: None)
+        return HttpResponse(response, content_type="application/json", status=400)
+
+    request_id = payload.get("id") if isinstance(payload, dict) else None
+    if isinstance(payload, dict) and payload.get("method") not in rpc.ALLOWED_METHODS:
+        return JsonResponse(
+            build_jsonrpc_error(
+                32714,
+                rpc.get_error_message(32714),
+                request_id=request_id,
+            ),
+            status=404,
+        )
+
+    response = dispatch(payload_text, validator=lambda _: None)
+    if response == "":
+        return HttpResponse(status=204)
+
+    return HttpResponse(response, content_type="application/json")
+
+

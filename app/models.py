@@ -1,7 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from decimal import Decimal
-import uuid
 
 
 class StatusChoices(models.TextChoices):
@@ -14,9 +13,7 @@ class Card(models.Model):
     card_number = models.CharField(max_length=16, unique=True)
     phone = models.CharField(max_length=13)
     balance = models.DecimalField(
-        max_digits=20,
-        decimal_places=2,
-        default=Decimal("0.00")
+        max_digits=20, decimal_places=2, default=Decimal("0.00")
     )
     status = models.CharField(max_length=10, choices=StatusChoices.choices)
     expire_date = models.DateField()
@@ -97,12 +94,15 @@ class Transfer(models.Model):
         return f"{self.ext_id} [{self.state}]"
 
 
-
 class Error(models.Model):
     code = models.IntegerField(unique=True)
     en = models.CharField(max_length=255)
     ru = models.CharField(max_length=255)
     uz = models.CharField(max_length=255)
+
+    def get_message(self, lang="uz"):
+        """Tilga qarab xabarni qaytaradi (default: uz)"""
+        return getattr(self, lang, self.en)
 
     def __str__(self):
         return f"{self.code}: {self.en}"
