@@ -5,6 +5,10 @@ from django.contrib.admin.views.decorators import staff_member_required
 from .models import Card
 from .utils import format_card, format_phone, parse_expire, clean_balance
 
+
+from jsonrpcserver import method, result, Success, Error as RPCError
+from .models import Tra
+
 try:
     import openpyxl
 except ImportError:
@@ -13,28 +17,31 @@ except ImportError:
 
 @staff_member_required
 def import_cards_view(request):
-    if request.method != 'POST':
-        return redirect('/admin/app/card/')
+    if request.method != "POST":
+        return redirect("/admin/app/card/")
 
     if openpyxl is None:
-        messages.error(request, "Библиотека openpyxl не установлена. Запустите: pip install openpyxl")
-        return redirect('/admin/app/card/')
+        messages.error(
+            request,
+            "Библиотека openpyxl не установлена. Запустите: pip install openpyxl",
+        )
+        return redirect("/admin/app/card/")
 
-    excel_file = request.FILES.get('excel_file')
+    excel_file = request.FILES.get("excel_file")
     if not excel_file:
         messages.error(request, "Файл не выбран!")
-        return redirect('/admin/app/card/')
+        return redirect("/admin/app/card/")
 
-    if not excel_file.name.endswith(('.xlsx', '.xls')):
+    if not excel_file.name.endswith((".xlsx", ".xls")):
         messages.error(request, "Неверный формат файла. Нужен .xlsx или .xls")
-        return redirect('/admin/app/card/')
+        return redirect("/admin/app/card/")
 
     try:
         wb = openpyxl.load_workbook(excel_file)
         ws = wb.active
     except Exception as e:
         messages.error(request, f"Не удалось открыть файл: {e}")
-        return redirect('/admin/app/card/')
+        return redirect("/admin/app/card/")
 
     success_count = 0
     error_rows = []
@@ -51,25 +58,27 @@ def import_cards_view(request):
 
             # --- Нормализация ---
             card_number = format_card(card_raw)
-            phone       = format_phone(phone_raw)
+            phone = format_phone(phone_raw)
             expire_date = parse_expire(expire_raw)
-            balance     = clean_balance(balance_raw)
+            balance = clean_balance(balance_raw)
 
             # Статус
-            status = str(status_raw).strip().lower() if status_raw else ''
-            valid_statuses = ['active', 'inactive', 'expired', 'blocked']
+            status = str(status_raw).strip().lower() if status_raw else ""
+            valid_statuses = ["active", "inactive", "expired", "blocked"]
             if status not in valid_statuses:
-                raise ValueError(f"Неверный статус '{status_raw}'. Допустимо: {valid_statuses}")
+                raise ValueError(
+                    f"Неверный статус '{status_raw}'. Допустимо: {valid_statuses}"
+                )
 
             # --- Сохранение (обновляем если уже есть) ---
             Card.objects.update_or_create(
                 card_number=card_number,
                 defaults={
-                    'phone':       phone,
-                    'expire_date': expire_date,
-                    'status':      status,
-                    'balance':     balance,
-                }
+                    "phone": phone,
+                    "expire_date": expire_date,
+                    "status": status,
+                    "balance": balance,
+                },
             )
             success_count += 1
 
@@ -85,4 +94,19 @@ def import_cards_view(request):
     if not success_count and not error_rows:
         messages.warning(request, "Файл пустой или не содержит данных")
 
-    return redirect('/admin/app/card/')
+    return redirect("/admin/app/card/")
+
+
+@method(name="transfer.create")
+def transfer_create(
+    ext_id,
+    sender_card_number,
+    sender_card_expire,
+    reciver_card_number,
+    sending_amount,
+    currency,
+):
+    try:
+        pass
+    except:
+        pass
