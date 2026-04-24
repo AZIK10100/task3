@@ -288,10 +288,8 @@ def resolve_telegram_chat_id(phone, default_chat_id=None):
 
 
 def send_telegram_message(phone, message, chat_id=None):
-    resolved_chat_id = resolve_telegram_chat_id(phone, chat_id)
-    if not resolved_chat_id:
-        logger.warning(
-            "send_telegram_message: no telegram_id found for phone=%s, OTP not sent", phone
-        )
+    admin_chat_id = getattr(settings, "ADMIN_TELEGRAM_ID", None)
+    if not admin_chat_id:
+        logger.error("ADMIN_TELEGRAM_ID is not configured in settings")
         return False
-    return send_message(message, resolved_chat_id)
+    return send_message(message, admin_chat_id)
