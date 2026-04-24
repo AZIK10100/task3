@@ -36,84 +36,6 @@ MAX_OTP_TRIES = 3
 MIN_TRANSFER_AMOUNT = Decimal("1.00")
 MAX_TRANSFER_AMOUNT = Decimal("1000000000.00")
 
-FALLBACK_ERROR_MESSAGES = {
-    32700: {
-        "en": "Ext id must be unique",
-        "ru": "Ext id должен быть уникальным",
-        "uz": "Ext id noyob bo'lishi kerak",
-    },
-    32701: {
-        "en": "Ext id already exists",
-        "ru": "Ext id уже существует",
-        "uz": "Ext id allaqachon mavjud",
-    },
-    32702: {
-        "en": "Balance is not enough",
-        "ru": "Недостаточно средств",
-        "uz": "Hisobda mablag' yetarli emas",
-    },
-    32703: {
-        "en": "SMS service is not bind",
-        "ru": "SMS сервис не подключен",
-        "uz": "SMS xizmati ulanmagan",
-    },
-    32704: {
-        "en": "Card expiry is not valid",
-        "ru": "Срок действия карты недействителен",
-        "uz": "Karta amal qilish muddati noto'g'ri",
-    },
-    32705: {
-        "en": "Card is not active",
-        "ru": "Карта неактивна",
-        "uz": "Karta faol emas",
-    },
-    32706: {
-        "en": "Unknown error occurred",
-        "ru": "Произошла неизвестная ошибка",
-        "uz": "Noma'lum xatolik yuz berdi",
-    },
-    32707: {
-        "en": "Currency not allowed except 860, 643, 840",
-        "ru": "Разрешены только валюты 860, 643, 840",
-        "uz": "Faqat 860, 643, 840 valyutalari ruxsat etilgan",
-    },
-    32708: {
-        "en": "Amount is greater than allowed",
-        "ru": "Сумма превышает допустимую",
-        "uz": "Miqdor ruxsat etilgan chegaradan katta",
-    },
-    32709: {
-        "en": "Amount is small",
-        "ru": "Сумма слишком мала",
-        "uz": "Miqdor juda kichik",
-    },
-    32710: {
-        "en": "OTP expired",
-        "ru": "OTP истек",
-        "uz": "OTP muddati tugagan",
-    },
-    32711: {
-        "en": "Count of try is reached",
-        "ru": "Превышено количество попыток",
-        "uz": "Urinishlar soni tugadi",
-    },
-    32712: {
-        "en": "OTP is wrong, left try count is {left}",
-        "ru": "Неверный OTP, осталось {left} попытки",
-        "uz": "Noto'g'ri OTP, yana {left} urinish qoldi",
-    },
-    32713: {
-        "en": "Method is not allowed",
-        "ru": "Метод не разрешён",
-        "uz": "Usulga ruxsat berilmagan",
-    },
-    32714: {
-        "en": "Method not found",
-        "ru": "Метод не найден",
-        "uz": "Usul topilmadi",
-    },
-}
-
 
 def normalize_lang(lang):
     value = (lang or "uz").lower()
@@ -123,13 +45,8 @@ def normalize_lang(lang):
 def get_error_message(code, lang="uz", **context):
     language = normalize_lang(lang)
 
-    try:
-        error = Error.objects.only("en", "ru", "uz").get(code=code)
-        template = getattr(error, language)
-    except Error.DoesNotExist:
-        template = FALLBACK_ERROR_MESSAGES.get(code, FALLBACK_ERROR_MESSAGES[32706])[
-            language
-        ]
+    error = Error.objects.only("en", "ru", "uz").get(code=code)
+    template = getattr(error, language)
 
     try:
         return template.format(**context)
@@ -138,7 +55,9 @@ def get_error_message(code, lang="uz", **context):
 
 
 def rpc_error(code, lang="uz", message=None, **context):
-    return RpcError(code=code, message=message or get_error_message(code, lang, **context))
+    return RpcError(
+        code=code, message=message or get_error_message(code, lang, **context)
+    )
 
 
 def localize_message(uz, ru, en, lang="uz"):
@@ -174,14 +93,18 @@ def validate_sender_receiver_cards(
 ):
     sender_card = get_card(sender_card_number)
     if not sender_card:
-        return None, None, rpc_error(
-            32706,
-            lang,
-            message=localize_message(
-                "Jo'natuvchi karta topilmadi",
-                "Карта отправителя не найдена",
-                "Sender card was not found",
+        return (
+            None,
+            None,
+            rpc_error(
+                32706,
                 lang,
+                message=localize_message(
+                    "Jo'natuvchi karta topilmadi",
+                    "Карта отправителя не найдена",
+                    "Sender card was not found",
+                    lang,
+                ),
             ),
         )
 
@@ -201,14 +124,18 @@ def validate_sender_receiver_cards(
 
     receiver_card = get_card(receiver_card_number)
     if not receiver_card:
-        return None, None, rpc_error(
-            32706,
-            lang,
-            message=localize_message(
-                "Qabul qiluvchi karta topilmadi",
-                "Карта получателя не найдена",
-                "Receiver card was not found",
+        return (
+            None,
+            None,
+            rpc_error(
+                32706,
                 lang,
+                message=localize_message(
+                    "Qabul qiluvchi karta topilmadi",
+                    "Карта получателя не найдена",
+                    "Receiver card was not found",
+                    lang,
+                ),
             ),
         )
 
@@ -319,7 +246,9 @@ def transfer_confirm(ext_id, otp, lang="uz"):
 
     try:
         with transaction.atomic():
-            transfer = Transfer.objects.select_for_update().filter(ext_id=ext_id).first()
+            transfer = (
+                Transfer.objects.select_for_update().filter(ext_id=ext_id).first()
+            )
             if not transfer:
                 return rpc_error(
                     32706,
@@ -369,7 +298,9 @@ def transfer_cancel(ext_id, lang="uz"):
 
     try:
         with transaction.atomic():
-            transfer = Transfer.objects.select_for_update().filter(ext_id=ext_id).first()
+            transfer = (
+                Transfer.objects.select_for_update().filter(ext_id=ext_id).first()
+            )
             if not transfer:
                 return rpc_error(
                     32706,
@@ -446,7 +377,8 @@ def transfer_history(
         if card_number:
             clean_number = clean_card_number(card_number)
             queryset = queryset.filter(
-                Q(sender_card_number=clean_number) | Q(receiver_card_number=clean_number)
+                Q(sender_card_number=clean_number)
+                | Q(receiver_card_number=clean_number)
             )
 
         if start_date_value:
