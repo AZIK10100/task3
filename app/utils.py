@@ -4,6 +4,8 @@ import re
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
+import requests
+from django.conf import settings
 from django.utils import timezone
 
 
@@ -96,10 +98,35 @@ def prepare_message(card_number: str, balance, lang: str = "UZ") -> str:
     return f"Your card {masked} is active, balance: {balance} UZS!"
 
 
-def send_message(message: str, chat_id: int = 12345) -> bool:
-    logger.info("Simulated telegram message to chat_id=%s", chat_id)
-    print(f"[TELEGRAM] chat_id={chat_id}: {message}")
-    return True
+def send_message(message: str, chat_id) -> bool:
+    """Send a message via the Telegram Bot API. Returns True on success."""
+    token = getattr(settings, "BOT_TOKEN", None)
+    if not token:
+        logger.error("BOT_TOKEN is not configured in settings")
+        return False
+    if not chat_id:
+        logger.warning("send_message called with empty chat_id — message not sent")
+        return False
+    try:
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        resp = requests.post(
+            url,
+            json={"chat_id": chat_id, "text": message},
+            timeout=10,
+        )
+        data = resp.json()
+        if not data.get("ok"):
+            logger.error(
+                "Telegram API error chat_id=%s: %s",
+                chat_id,
+                data.get("description"),
+            )
+            return False
+        logger.info("OTP sent via Telegram to chat_id=%s", chat_id)
+        return True
+    except requests.RequestException as exc:
+        logger.exception("Failed to send Telegram message to chat_id=%s: %s", chat_id, exc)
+        return False
 
 
 def phone_mask(phone: str) -> str:
@@ -233,7 +260,7 @@ def is_otp_expired(transfer, lifetime_seconds=OTP_LIFETIME_SECONDS):
     return timezone.now() > expires_at
 
 
-def resolve_telegram_chat_id(phone, default_chat_id=123456):
+def resolve_telegram_chat_id(phone, default_chat_id=None):
     if not phone:
         return default_chat_id
 
@@ -260,6 +287,11 @@ def resolve_telegram_chat_id(phone, default_chat_id=123456):
     return default_chat_id
 
 
-def send_telegram_message(phone, message, chat_id=123456):
+def send_telegram_message(phone, message, chat_id=None):
     resolved_chat_id = resolve_telegram_chat_id(phone, chat_id)
+    if not resolved_chat_id:
+        logger.warning(
+            "send_telegram_message: no telegram_id found for phone=%s, OTP not sent", phone
+        )
+        return False
     return send_message(message, resolved_chat_id)
