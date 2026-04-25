@@ -62,6 +62,21 @@ class CurrencyChoices(models.IntegerChoices):
 class Transfer(models.Model):
     ext_id = models.CharField(max_length=64, unique=True)
 
+    sender_card = models.ForeignKey(
+        Card,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sent_transfers",
+    )
+    receiver_card = models.ForeignKey(
+        Card,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="received_transfers",
+    )
+
     sender_card_number = models.CharField(max_length=16)
     receiver_card_number = models.CharField(max_length=16)
 

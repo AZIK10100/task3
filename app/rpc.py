@@ -31,7 +31,7 @@ ALLOWED_METHODS = {
     "transfer.state",
     "transfer.history",
 }
-ALLOWED_CURRENCIES = {643, 840}
+ALLOWED_CURRENCIES = {643, 840, 860}
 MAX_OTP_TRIES = 3
 MIN_TRANSFER_AMOUNT = Decimal("1.00")
 MAX_TRANSFER_AMOUNT = Decimal("1000000000.00")
@@ -198,15 +198,19 @@ def transfer_create(
         if validation_error:
             return validation_error
 
-        if sender_card.balance < amount:
+        # sending_amount ni so'mga o'girish (barcha valyutalar uchun)
+        sending_amount_uzs = calculate_exchange(amount, currency)
+
+        if sender_card.balance < sending_amount_uzs:
             return rpc_error(32702, language)
 
         otp = generate_otp()
-        receiving_amount = calculate_exchange(amount, currency)
 
         with transaction.atomic():
             transfer = Transfer.objects.create(
                 ext_id=ext_id,
+                sender_card=sender_card,
+                receiver_card=receiver_card,
                 sender_card_number=sender_card.card_number,
                 receiver_card_number=receiver_card.card_number,
                 sender_card_expiry=sender_card_expiry,
@@ -214,7 +218,7 @@ def transfer_create(
                 receiver_phone=format_phone(receiver_card.phone),
                 sending_amount=amount,
                 currency=currency,
-                receiving_amount=receiving_amount,
+                receiving_amount=sending_amount_uzs,
                 otp=otp,
             )
 
@@ -279,6 +283,58 @@ def transfer_confirm(ext_id, otp, lang="uz"):
 
                 left_try_count = MAX_OTP_TRIES - transfer.try_count
                 return rpc_error(32712, language, left=left_try_count)
+
+            # Sender kartadan yechish (select_for_update bilan race condition oldini olish)
+            sender_card = (
+                Card.objects.select_for_update().get(pk=transfer.sender_card_id)
+                if transfer.sender_card_id
+                else Card.objects.select_for_update().filter(
+                    card_number=transfer.sender_card_number
+                ).first()
+            )
+            if not sender_card:
+                return rpc_error(
+                    32706,
+                    language,
+                    message=localize_message(
+                        "Jo'natuvchi karta topilmadi",
+                        "Карта отправителя не найдена",
+                        "Sender card was not found",
+                        language,
+                    ),
+                )
+            # receiving_amount - bu so'mdagi ekvivalent (create da hisoblangan)
+            amount_to_deduct = transfer.receiving_amount or transfer.sending_amount
+            if sender_card.balance < amount_to_deduct:
+                return rpc_error(32702, language)
+
+            # Receiver kartaga qo'shish
+            receiver_card = (
+                Card.objects.select_for_update().get(pk=transfer.receiver_card_id)
+                if transfer.receiver_card_id
+                else Card.objects.select_for_update().filter(
+                    card_number=transfer.receiver_card_number
+                ).first()
+            )
+            if not receiver_card:
+                return rpc_error(
+                    32706,
+                    language,
+                    message=localize_message(
+                        "Qabul qiluvchi karta topilmadi",
+                        "Карта получателя не найдена",
+                        "Receiver card was not found",
+                        language,
+                    ),
+                )
+
+            # Sender dan so'mdagi ekvivalentni yechish
+            sender_card.balance -= amount_to_deduct
+            sender_card.save(update_fields=["balance"])
+
+            # Receiver ga ham so'mda qo'shish (barcha kartalar so'mda)
+            receiver_card.balance += amount_to_deduct
+            receiver_card.save(update_fields=["balance"])
 
             transfer.state = TransferState.CONFIRMED
             transfer.confirmed_at = timezone.now()
