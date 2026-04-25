@@ -449,7 +449,11 @@ def transfer_history(
         result = [
             {
                 "ext_id": transfer.ext_id,
-                "sending_amount": float(transfer.sending_amount),
+                "sending_amount": float(
+                    transfer.receiving_amount
+                    if transfer.receiving_amount is not None
+                    else transfer.sending_amount
+                ),
                 "state": transfer.state,
                 "created_at": transfer.created_at.isoformat(),
             }
