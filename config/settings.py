@@ -102,3 +102,34 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 AUTH_USER_MODEL = "app.User"
 STATIC_URL = "static/"
+
+
+REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379")
+
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": f"{REDIS_URL}/1",
+        "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
+        "TIMEOUT": 30,
+    }
+}
+
+
+CELERY_BROKER_URL = f"{REDIS_URL}/0"
+CELERY_RESULT_BACKEND = f"{REDIS_URL}/0"
+CELERY_TIMEZONE = "UTC"
+CELERY_TASK_TRACK_STARTED = True
+
+from celery.schedules import crontab
+CELERY_BEAT_SCHEDULE = {
+    "hourly-stats": {
+        "task": "app.tasks.send_stats_report",
+        "schedule": crontab(minute=0),         
+    },
+    "daily-stats": {
+        "task": "app.tasks.send_stats_report",
+        "schedule": crontab(hour=9, minute=0), 
+    },
+}
