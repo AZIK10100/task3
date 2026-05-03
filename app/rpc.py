@@ -21,6 +21,8 @@ from .utils import (
     send_telegram_message,
 )
 
+from .decorators import log_rpc_method
+
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +32,7 @@ ALLOWED_METHODS = {
     "transfer.cancel",
     "transfer.state",
     "transfer.history",
+    "card.info",
 }
 ALLOWED_CURRENCIES = {643, 840, 860}
 MAX_OTP_TRIES = 3
@@ -169,6 +172,7 @@ def parse_history_date(raw_value, field_name, lang="uz"):
 
 
 @method(name="transfer.create")
+@log_rpc_method
 def transfer_create(
     ext_id,
     sender_card_number,
@@ -244,6 +248,7 @@ def transfer_create(
 
 
 @method(name="transfer.confirm")
+@log_rpc_method
 def transfer_confirm(ext_id, otp, lang="uz"):
     language = normalize_lang(lang)
     logger.info("transfer.confirm ext_id=%s", ext_id)
@@ -348,6 +353,7 @@ def transfer_confirm(ext_id, otp, lang="uz"):
 
 
 @method(name="transfer.cancel")
+@log_rpc_method
 def transfer_cancel(ext_id, lang="uz"):
     language = normalize_lang(lang)
     logger.info("transfer.cancel ext_id=%s", ext_id)
@@ -467,3 +473,77 @@ def transfer_history(
     except Exception:
         logger.exception("transfer.history failed")
         return rpc_error(32706, language)
+
+# ABDUVORIS ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+import json
+from django.core.cache import cache
+
+CARD_INFO_CACHE_TTL = 30  # 30 секунд
+
+
+def mask_card(card_number: str) -> str:
+    """
+    8600121234561234  →  860012******1234
+    первые 6 цифр + ****** + последние 4
+    """
+    if len(card_number) < 10:
+        return card_number
+    return card_number[:6] + "******" + card_number[-4:]
+
+
+@method(name="card.info")
+def card_info(card_number, expiry, lang="uz"):
+    language = normalize_lang(lang)
+
+    # --- Уникальный ключ для каждой карты ---
+    cache_key = f"card_info:{card_number}:{expiry}"
+
+    # --- Шаг 1: смотрим в Redis ---
+    cached = cache.get(cache_key)
+    if cached:
+        data = json.loads(cached)
+        if data.get("error"):
+            # Закэшированная ошибка — возвращаем ошибку, БД не трогаем
+            return rpc_error(data["code"], language)
+        # Закэшированный успех — возвращаем сразу
+        return Success(data)
+
+    # --- Шаг 2: валидация expiry ---
+    try:
+        parsed_expiry = parse_expire(expiry)
+    except ValueError:
+        # Кэшируем ошибку тоже!
+        error_data = {"error": True, "code": 32704}
+        cache.set(cache_key, json.dumps(error_data), timeout=CARD_INFO_CACHE_TTL)
+        return rpc_error(32704, language)
+
+    # --- Шаг 3: ORM запрос к БД ---
+    card = Card.objects.filter(
+        card_number=clean_card_number(card_number)
+    ).first()
+
+    if not card:
+        # Карта не найдена — кэшируем ошибку
+        error_data = {"error": True, "code": 32706}
+        cache.set(cache_key, json.dumps(error_data), timeout=CARD_INFO_CACHE_TTL)
+        return rpc_error(32706, language)
+
+    if not expiry_matches(card.expire_date, parsed_expiry):
+        # Срок не совпадает — кэшируем ошибку
+        error_data = {"error": True, "code": 32704}
+        cache.set(cache_key, json.dumps(error_data), timeout=CARD_INFO_CACHE_TTL)
+        return rpc_error(32704, language)
+
+    # --- Шаг 4: формируем ответ ---
+    response_data = {
+        "error": False,
+        "card_status": card.status,
+        "balance":     str(card.balance),
+        "phone":       card.phone,
+        "masked_card": mask_card(card.card_number),
+    }
+
+    # --- Шаг 5: кэшируем успех на 30 секунд ---
+    cache.set(cache_key, json.dumps(response_data), timeout=CARD_INFO_CACHE_TTL)
+
+    return Success(response_data)

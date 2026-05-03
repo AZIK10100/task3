@@ -107,8 +107,17 @@ def build_jsonrpc_error(code, message, request_id=None):
     }
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 @csrf_exempt
 def rpc_endpoint(request):
+    # Логируем IP адрес
+    ip = request.META.get("HTTP_X_FORWARDED_FOR") or request.META.get("REMOTE_ADDR", "unknown")
+    logger.info("[RPC] REQUEST | IP=%s | body=%s", ip, request.body.decode("utf-8")[:500])
+
     if request.method != "POST":
         return JsonResponse(
             build_jsonrpc_error(32713, rpc.get_error_message(32713)),
@@ -121,10 +130,12 @@ def rpc_endpoint(request):
         payload = json.loads(payload_text)
     except json.JSONDecodeError:
         response = dispatch(payload_text, validator=lambda _: None)
+        logger.warning("[RPC] INVALID JSON | IP=%s", ip)
         return HttpResponse(response, content_type="application/json", status=400)
 
     request_id = payload.get("id") if isinstance(payload, dict) else None
     if isinstance(payload, dict) and payload.get("method") not in rpc.ALLOWED_METHODS:
+        logger.warning("[RPC] METHOD NOT FOUND | IP=%s | method=%s", ip, payload.get("method"))
         return JsonResponse(
             build_jsonrpc_error(
                 32714,
@@ -135,6 +146,10 @@ def rpc_endpoint(request):
         )
 
     response = dispatch(payload_text, validator=lambda _: None)
+
+    # Логируем response
+    logger.info("[RPC] RESPONSE | IP=%s | response=%s", ip, str(response)[:500])
+
     if response == "":
         return HttpResponse(status=204)
 
