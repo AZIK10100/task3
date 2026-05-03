@@ -9,7 +9,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv("SECRET_KEY", "hello-beby-there-is-not-your-home")
 
-DEBUG = os.getenv("DEBUG", None) == "False"
+DEBUG = True
 # DEBUG = True
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "*").split(",")
 
@@ -131,5 +131,41 @@ CELERY_BEAT_SCHEDULE = {
     "daily-stats": {
         "task": "app.tasks.send_stats_report",
         "schedule": crontab(hour=9, minute=0), 
+    },
+}
+
+import os
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{asctime} {levelname} {name} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "file": {
+            "class": "logging.FileHandler",
+            "filename": os.path.join(BASE_DIR, "logs/rpc.log"),
+            "formatter": "verbose",
+        },
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "loggers": {
+        "app.decorators": {
+            "handlers": ["file", "console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "app.views": {
+            "handlers": ["file", "console"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
 }
