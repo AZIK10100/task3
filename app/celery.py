@@ -8,10 +8,10 @@ from app.utils import send_message
 def send_stats_report():
     total_cards = Card.objects.count()
     total_transfers = Transfer.objects.count()
-    message = f"📊 Daily Report\nTotal cards: {total_cards}\nTotal transfers: {total_transfers}"
+    message = f" Daily Report\nTotal cards: {total_cards}\nTotal transfers: {total_transfers}"
     admin_chat_id = getattr(settings, "ADMIN_TELEGRAM_ID", None)
     if admin_chat_id:
         send_message(message, admin_chat_id)
     else:
-        # Optionally log error if admin chat id is not set
+
         pass
