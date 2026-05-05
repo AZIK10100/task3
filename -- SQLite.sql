@@ -30,3 +30,8 @@ WHERE card_number NOT IN (
 SELECT DISTINCT c.phone
 FROM app_card c
 JOIN app_transfer t ON t.sender_card_number = c.card_number;
+-- 0. Duplicate cards
+SELECT card_number, COUNT(*) AS duplicate_count
+FROM app_card
+GROUP BY card_number
+HAVING COUNT(*) > 1;
