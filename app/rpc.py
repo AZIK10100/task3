@@ -1,7 +1,9 @@
+import json
 import logging
 from datetime import date
 from decimal import Decimal
 
+from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -38,6 +40,32 @@ ALLOWED_CURRENCIES = {643, 840, 860}
 MAX_OTP_TRIES = 3
 MIN_TRANSFER_AMOUNT = Decimal("1.00")
 MAX_TRANSFER_AMOUNT = Decimal("1000000000.00")
+CARD_INFO_CACHE_TTL = 30
+ERROR_MESSAGE_CACHE_TTL = 300
+CACHE_UNAVAILABLE = False
+
+
+def safe_cache_get(key):
+    global CACHE_UNAVAILABLE
+    if CACHE_UNAVAILABLE:
+        return None
+    try:
+        return cache.get(key)
+    except Exception:
+        CACHE_UNAVAILABLE = True
+        logger.warning("cache unavailable, falling back to ORM key=%s", key)
+        return None
+
+
+def safe_cache_set(key, value, timeout):
+    global CACHE_UNAVAILABLE
+    if CACHE_UNAVAILABLE:
+        return
+    try:
+        cache.set(key, value, timeout=timeout)
+    except Exception:
+        CACHE_UNAVAILABLE = True
+        logger.warning("cache unavailable, skip set key=%s", key)
 
 
 def normalize_lang(lang):
@@ -47,9 +75,13 @@ def normalize_lang(lang):
 
 def get_error_message(code, lang="uz", **context):
     language = normalize_lang(lang)
+    cache_key = f"error_message:{code}:{language}"
+    template = safe_cache_get(cache_key)
 
-    error = Error.objects.only("en", "ru", "uz").get(code=code)
-    template = getattr(error, language)
+    if template is None:
+        error = Error.objects.only("en", "ru", "uz").get(code=code)
+        template = getattr(error, language)
+        safe_cache_set(cache_key, template, ERROR_MESSAGE_CACHE_TTL)
 
     try:
         return template.format(**context)
@@ -474,13 +506,6 @@ def transfer_history(
         logger.exception("transfer.history failed")
         return rpc_error(32706, language)
 
-# ABDUVORIS ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
-import json
-from django.core.cache import cache
-
-CARD_INFO_CACHE_TTL = 30  # 30 секунд
-
-
 def mask_card(card_number: str) -> str:
     """
     8600121234561234  →  860012******1234
@@ -499,7 +524,7 @@ def card_info(card_number, expiry, lang="uz"):
     cache_key = f"card_info:{card_number}:{expiry}"
 
     # --- Шаг 1: смотрим в Redis ---
-    cached = cache.get(cache_key)
+    cached = safe_cache_get(cache_key)
     if cached:
         data = json.loads(cached)
         if data.get("error"):
@@ -514,7 +539,7 @@ def card_info(card_number, expiry, lang="uz"):
     except ValueError:
         # Кэшируем ошибку тоже!
         error_data = {"error": True, "code": 32704}
-        cache.set(cache_key, json.dumps(error_data), timeout=CARD_INFO_CACHE_TTL)
+        safe_cache_set(cache_key, json.dumps(error_data), CARD_INFO_CACHE_TTL)
         return rpc_error(32704, language)
 
     # --- Шаг 3: ORM запрос к БД ---
@@ -525,13 +550,13 @@ def card_info(card_number, expiry, lang="uz"):
     if not card:
         # Карта не найдена — кэшируем ошибку
         error_data = {"error": True, "code": 32706}
-        cache.set(cache_key, json.dumps(error_data), timeout=CARD_INFO_CACHE_TTL)
+        safe_cache_set(cache_key, json.dumps(error_data), CARD_INFO_CACHE_TTL)
         return rpc_error(32706, language)
 
     if not expiry_matches(card.expire_date, parsed_expiry):
         # Срок не совпадает — кэшируем ошибку
         error_data = {"error": True, "code": 32704}
-        cache.set(cache_key, json.dumps(error_data), timeout=CARD_INFO_CACHE_TTL)
+        safe_cache_set(cache_key, json.dumps(error_data), CARD_INFO_CACHE_TTL)
         return rpc_error(32704, language)
 
     # --- Шаг 4: формируем ответ ---
@@ -544,6 +569,6 @@ def card_info(card_number, expiry, lang="uz"):
     }
 
     # --- Шаг 5: кэшируем успех на 30 секунд ---
-    cache.set(cache_key, json.dumps(response_data), timeout=CARD_INFO_CACHE_TTL)
+    safe_cache_set(cache_key, json.dumps(response_data), CARD_INFO_CACHE_TTL)
 
     return Success(response_data)
