@@ -31,7 +31,7 @@ def log_rpc_method(func):
                 method_name,
                 ext_id,
                 elapsed,
-                str(result)[:300],
+                repr(result)[:300],
             )
             return result
 
