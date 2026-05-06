@@ -369,6 +369,9 @@ def transfer_confirm(ext_id, otp, lang="uz"):
             sender_card.balance -= amount_to_deduct
             sender_card.save(update_fields=["balance"])
 
+            spent_amount = amount_to_deduct
+            remaining_balance = sender_card.balance
+
             # Receiver ga ham so'mda qo'shish (barcha kartalar so'mda)
             receiver_card.balance += amount_to_deduct
             receiver_card.save(update_fields=["balance"])
@@ -378,7 +381,30 @@ def transfer_confirm(ext_id, otp, lang="uz"):
             transfer.otp = None
             transfer.save(update_fields=["state", "confirmed_at", "otp", "updated_at"])
 
-        return Success({"ext_id": transfer.ext_id, "state": transfer.state})
+        balance_message = localize_message(
+            f"Transfer tasdiqlandi!\n\n"
+            f"Yuborilgan summa: {spent_amount:,.2f} so'm\n"
+            f"Qoldiq balans: {remaining_balance:,.2f} so'm",
+
+            f"Перевод подтверждён!\n\n"
+            f"Потраченная сумма: {spent_amount:,.2f} сум\n"
+            f"Остаток баланса: {remaining_balance:,.2f} сум"
+            f"Transfer confirmed!\n\n"
+            
+            f"Spent amount: {spent_amount:,.2f} sum\n"
+            f"Remaining balance: {remaining_balance:,.2f} sum",
+
+            language,
+        )
+        send_telegram_message(sender_card.phone, balance_message)
+
+        return Success({
+            "ext_id": transfer.ext_id,
+            "state": transfer.state,
+            "spent_amount": float(spent_amount),
+            "remaining_balance": float(remaining_balance),
+        })
+
     except Exception:
         logger.exception("transfer.confirm failed ext_id=%s", ext_id)
         return rpc_error(32706, language)
@@ -572,3 +598,4 @@ def card_info(card_number, expiry, lang="uz"):
     safe_cache_set(cache_key, json.dumps(response_data), CARD_INFO_CACHE_TTL)
 
     return Success(response_data)
+    
