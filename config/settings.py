@@ -168,4 +168,4 @@ LOGGING = {
             "propagate": False,
         },
     },
-}
+},
