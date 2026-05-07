@@ -66,12 +66,12 @@ class Command(BaseCommand):
             if created:
                 created_count += 1
                 self.stdout.write(self.style.SUCCESS(
-                    f"✓ Created error {code}: {en}"
+                    f"Created error {code}: {en}"
                 ))
             else:
                 skipped_count += 1
                 self.stdout.write(self.style.WARNING(
-                    f"• Skipped {code} (already exists)"
+                    f"Skipped {code} (already exists)"
                 ))
 
         self.stdout.write(self.style.SUCCESS(

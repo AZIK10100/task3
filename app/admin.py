@@ -4,7 +4,7 @@ from django import forms
 from import_export import resources
 from import_export.admin import ExportMixin
 
-from .models import Card
+from .models import Card, Transfer
 from .utils import card_mask, phone_mask, format_card_number, format_phone_number, parse_expire
 from . import views
 
@@ -12,6 +12,11 @@ from . import views
 class CardResource(resources.ModelResource):
     class Meta:
         model = Card
+
+
+class TransferResource(resources.ModelResource):
+    class Meta:
+        model = Transfer
 
 
 class CardAdminForm(forms.ModelForm):
@@ -70,3 +75,20 @@ class CardAdmin(ExportMixin, admin.ModelAdmin):
     @admin.display(description="Телефон")
     def masked_phone(self, obj):
         return phone_mask(obj.phone) if obj.phone else "—"
+
+
+@admin.register(Transfer)
+class TransferAdmin(ExportMixin, admin.ModelAdmin):
+    resource_class = TransferResource
+    list_display = (
+        "ext_id",
+        "sender_card_number",
+        "receiver_card_number",
+        "sending_amount",
+        "currency",
+        "state",
+        "created_at",
+    )
+    list_filter = ("state", "currency", "created_at")
+    search_fields = ("ext_id", "sender_card_number", "receiver_card_number")
+    ordering = ("-created_at",)

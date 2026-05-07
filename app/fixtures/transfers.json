@@ -1,0 +1,122 @@
+[
+  {
+    "model": "app.transfer",
+    "pk": 1,
+    "fields": {
+      "ext_id": "TRX-0001",
+      "sender_card": null,
+      "receiver_card": null,
+      "sender_card_number": "8600123456789012",
+      "receiver_card_number": "8600987654321098",
+      "sender_card_expiry": "12/26",
+      "sender_phone": "+998901234567",
+      "receiver_phone": "+998907654321",
+      "sending_amount": "500000.00",
+      "currency": 860,
+      "receiving_amount": "500000.00",
+      "state": "confirmed",
+      "try_count": 1,
+      "otp": null,
+      "created_at": "2024-11-01T10:00:00Z",
+      "confirmed_at": "2024-11-01T10:05:00Z",
+      "cancelled_at": null,
+      "updated_at": "2024-11-01T10:05:00Z"
+    }
+  },
+  {
+    "model": "app.transfer",
+    "pk": 2,
+    "fields": {
+      "ext_id": "TRX-0002",
+      "sender_card": null,
+      "receiver_card": null,
+      "sender_card_number": "8600111222333444",
+      "receiver_card_number": "8600555666777888",
+      "sender_card_expiry": "06/25",
+      "sender_phone": "+998901111111",
+      "receiver_phone": "+998902222222",
+      "sending_amount": "1200000.00",
+      "currency": 860,
+      "receiving_amount": "1200000.00",
+      "state": "created",
+      "try_count": 0,
+      "otp": "482910",
+      "created_at": "2024-11-02T09:30:00Z",
+      "confirmed_at": null,
+      "cancelled_at": null,
+      "updated_at": "2024-11-02T09:30:00Z"
+    }
+  },
+  {
+    "model": "app.transfer",
+    "pk": 3,
+    "fields": {
+      "ext_id": "TRX-0003",
+      "sender_card": null,
+      "receiver_card": null,
+      "sender_card_number": "8600444333222111",
+      "receiver_card_number": "8600999888777666",
+      "sender_card_expiry": "03/27",
+      "sender_phone": "+998903333333",
+      "receiver_phone": "+998904444444",
+      "sending_amount": "300000.00",
+      "currency": 860,
+      "receiving_amount": null,
+      "state": "cancelled",
+      "try_count": 3,
+      "otp": null,
+      "created_at": "2024-11-03T14:00:00Z",
+      "confirmed_at": null,
+      "cancelled_at": "2024-11-03T14:10:00Z",
+      "updated_at": "2024-11-03T14:10:00Z"
+    }
+  },
+  {
+    "model": "app.transfer",
+    "pk": 4,
+    "fields": {
+      "ext_id": "TRX-0004",
+      "sender_card": null,
+      "receiver_card": null,
+      "sender_card_number": "8600222333444555",
+      "receiver_card_number": "8600666777888999",
+      "sender_card_expiry": "08/26",
+      "sender_phone": "+998905555555",
+      "receiver_phone": "+998906666666",
+      "sending_amount": "750000.00",
+      "currency": 643,
+      "receiving_amount": "750000.00",
+      "state": "confirmed",
+      "try_count": 1,
+      "otp": null,
+      "created_at": "2024-11-04T11:00:00Z",
+      "confirmed_at": "2024-11-04T11:03:00Z",
+      "cancelled_at": null,
+      "updated_at": "2024-11-04T11:03:00Z"
+    }
+  },
+  {
+    "model": "app.transfer",
+    "pk": 5,
+    "fields": {
+      "ext_id": "TRX-0005",
+      "sender_card": null,
+      "receiver_card": null,
+      "sender_card_number": "8600777888999000",
+      "receiver_card_number": "8600000111222333",
+      "sender_card_expiry": "01/28",
+      "sender_phone": "+998907777777",
+      "receiver_phone": "+998908888888",
+      "sending_amount": "200.00",
+      "currency": 840,
+      "receiving_amount": "200.00",
+      "state": "created",
+      "try_count": 0,
+      "otp": "193847",
+      "created_at": "2024-11-05T08:15:00Z",
+      "confirmed_at": null,
+      "cancelled_at": null,
+      "updated_at": "2024-11-05T08:15:00Z"
+    }
+  }
+]

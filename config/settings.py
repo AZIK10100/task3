@@ -134,25 +134,14 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
-import os
-
-LOGGING = {
+logging = {
     "version": 1,
     "disable_existing_loggers": False,
-    "formatters": {
-        "verbose": {
-            "format": "{asctime} {levelname} {name} {message}",
-            "style": "{",
-        },
-    },
     "handlers": {
         "file": {
+            "level": "INFO",
             "class": "logging.FileHandler",
             "filename": os.path.join(BASE_DIR, "logs/rpc.log"),
-            "formatter": "verbose",
-        },
-        "console": {
-            "class": "logging.StreamHandler",
             "formatter": "verbose",
         },
     },
@@ -162,7 +151,7 @@ LOGGING = {
             "level": "INFO",
             "propagate": False,
         },
-        "app.views": {
+    "app.views": {
             "handlers": ["file", "console"],
             "level": "INFO",
             "propagate": False,
