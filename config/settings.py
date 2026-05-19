@@ -133,3 +133,28 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": crontab(hour=9, minute=0), 
     },
 }
+
+logging = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "file": {
+            "level": "INFO",
+            "class": "logging.FileHandler",
+            "filename": os.path.join(BASE_DIR, "logs/rpc.log"),
+            "formatter": "verbose",
+        },
+    },
+    "loggers": {
+        "app.decorators": {
+            "handlers": ["file", "console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    "app.views": {
+            "handlers": ["file", "console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}

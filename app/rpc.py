@@ -214,6 +214,36 @@ def transfer_create(
     currency,
     lang="uz",
 ):
+    """
+    Create a new transfer transaction.
+
+    This method validates sender and receiver cards,
+    checks balance and currency, generates OTP,
+    creates transfer record, and sends confirmation message.
+
+    Args:
+        ext_id (str): External unique transfer identifier.
+        sender_card_number (str): Sender card number.
+        sender_card_expiry (str): Sender card expiry date.
+        receiver_card_number (str): Receiver card number.
+        sending_amount (Decimal | int | float): Transfer amount.
+        currency (int): Currency code.
+        lang (str, optional): Response language. Defaults to 'uz'.
+
+    Returns:
+        Success: Transfer creation result with transfer state.
+        RpcError: Validation or processing error.
+
+    Example:
+        transfer.create(
+            ext_id='12345',
+            sender_card_number='8600123412341234',
+            sender_card_expiry='12/27',
+            receiver_card_number='9860123412341234',
+            sending_amount=10000,
+            currency=860
+        )
+    """
     language = normalize_lang(lang)
     logger.info("transfer.create ext_id=%s", ext_id)
 
@@ -282,6 +312,27 @@ def transfer_create(
 @method(name="transfer.confirm")
 @log_rpc_method
 def transfer_confirm(ext_id, otp, lang="uz"):
+    """
+    Confirm an existing transfer using OTP code.
+
+    This method validates OTP code, checks transfer state,
+    updates balances, and marks transfer as confirmed.
+
+    Args:
+        ext_id (str): External transfer identifier.
+        otp (str | int): One-time confirmation password.
+        lang (str, optional): Response language. Defaults to 'uz'.
+
+    Returns:
+        Success: Confirmed transfer information.
+        RpcError: Confirmation or validation error.
+
+    Example:
+        transfer.confirm(
+            ext_id='12345',
+            otp='5432'
+        )
+    """
     language = normalize_lang(lang)
     logger.info("transfer.confirm ext_id=%s", ext_id)
 
@@ -369,6 +420,9 @@ def transfer_confirm(ext_id, otp, lang="uz"):
             sender_card.balance -= amount_to_deduct
             sender_card.save(update_fields=["balance"])
 
+            spent_amount = amount_to_deduct
+            remaining_balance = sender_card.balance
+
             # Receiver ga ham so'mda qo'shish (barcha kartalar so'mda)
             receiver_card.balance += amount_to_deduct
             receiver_card.save(update_fields=["balance"])
@@ -378,7 +432,30 @@ def transfer_confirm(ext_id, otp, lang="uz"):
             transfer.otp = None
             transfer.save(update_fields=["state", "confirmed_at", "otp", "updated_at"])
 
-        return Success({"ext_id": transfer.ext_id, "state": transfer.state})
+        balance_message = localize_message(
+            f"Transfer tasdiqlandi!\n\n"
+            f"Yuborilgan summa: {spent_amount:,.2f} so'm\n"
+            f"Qoldiq balans: {remaining_balance:,.2f} so'm",
+
+            f"Перевод подтверждён!\n\n"
+            f"Потраченная сумма: {spent_amount:,.2f} сум\n"
+            f"Остаток баланса: {remaining_balance:,.2f} сум"
+            f"Transfer confirmed!\n\n"
+            
+            f"Spent amount: {spent_amount:,.2f} sum\n"
+            f"Remaining balance: {remaining_balance:,.2f} sum",
+
+            language,
+        )
+        send_telegram_message(sender_card.phone, balance_message)
+
+        return Success({
+            "ext_id": transfer.ext_id,
+            "state": transfer.state,
+            "spent_amount": float(spent_amount),
+            "remaining_balance": float(remaining_balance),
+        })
+
     except Exception:
         logger.exception("transfer.confirm failed ext_id=%s", ext_id)
         return rpc_error(32706, language)
@@ -387,6 +464,25 @@ def transfer_confirm(ext_id, otp, lang="uz"):
 @method(name="transfer.cancel")
 @log_rpc_method
 def transfer_cancel(ext_id, lang="uz"):
+    """
+    Cancel a created transfer.
+
+    This method changes transfer state to CANCELLED
+    if transfer has not been confirmed yet.
+
+    Args:
+        ext_id (str): External transfer identifier.
+        lang (str, optional): Response language. Defaults to 'uz'.
+
+    Returns:
+        Success: Cancelled transfer information.
+        RpcError: Validation or state error.
+
+    Example:
+        transfer.cancel(
+            ext_id='12345'
+        )
+    """
     language = normalize_lang(lang)
     logger.info("transfer.cancel ext_id=%s", ext_id)
 
@@ -518,6 +614,28 @@ def mask_card(card_number: str) -> str:
 
 @method(name="card.info")
 def card_info(card_number, expiry, lang="uz"):
+    """
+    Retrieve payment card information.
+
+    This method validates card number and expiry date,
+    checks cache storage, and returns card details
+    including masked card number and balance.
+
+    Args:
+        card_number (str): Full card number.
+        expiry (str): Card expiry date.
+        lang (str, optional): Response language. Defaults to 'uz'.
+
+    Returns:
+        Success: Card information response.
+        RpcError: Card validation or lookup error.
+
+    Example:
+        card.info(
+            card_number='8600123412341234',
+            expiry='12/27'
+        )
+    """
     language = normalize_lang(lang)
 
     # --- Уникальный ключ для каждой карты ---
@@ -572,3 +690,4 @@ def card_info(card_number, expiry, lang="uz"):
     safe_cache_set(cache_key, json.dumps(response_data), CARD_INFO_CACHE_TTL)
 
     return Success(response_data)
+    
