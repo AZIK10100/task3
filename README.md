@@ -17,6 +17,7 @@ Bu loyiha quyidagi imkoniyatlarni taqdim etadi:
 
 ---
 
+
 ## ⚙️ O'rnatish va sozlash
 
 ### 1. Talablar
