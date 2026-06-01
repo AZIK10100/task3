@@ -131,17 +131,8 @@ CELERY_RESULT_BACKEND = f"{REDIS_URL}/0"
 CELERY_TIMEZONE = "UTC"
 CELERY_TASK_TRACK_STARTED = True
 
-from celery.schedules import crontab
-CELERY_BEAT_SCHEDULE = {
-    "hourly-stats": {
-        "task": "app.tasks.send_stats_report",
-        "schedule": crontab(minute=0),         
-    },
-    "daily-stats": {
-        "task": "app.tasks.send_stats_report",
-        "schedule": crontab(hour=9, minute=0), 
-    },
-}
+
+
 
 logging = {
     "version": 1,
