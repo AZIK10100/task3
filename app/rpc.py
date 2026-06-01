@@ -43,6 +43,8 @@ MAX_TRANSFER_AMOUNT = Decimal("1000000000.00")
 CARD_INFO_CACHE_TTL = 30
 ERROR_MESSAGE_CACHE_TTL = 300
 CACHE_UNAVAILABLE = False
+from jsonrpcserver import method, Result, Success, Error as RPCError
+from .serializers import TransferCreateSerializer
 
 
 def safe_cache_get(key):
@@ -216,6 +218,26 @@ def transfer_create(
 ):
     language = normalize_lang(lang)
     logger.info("transfer.create ext_id=%s", ext_id)
+
+    data = {
+        "ext_id": ext_id,
+        "sender_card_number": sender_card_number,
+        "receiver_card_number": receiver_card_number,
+        "sender_card_expiry": sender_card_expiry,
+        "sending_amount": sending_amount,
+        "currency": currency
+    }
+
+    # ФЕЙСКОНТРОЛЬ (Пропускаем через сериализатор)
+    serializer = TransferCreateSerializer(data=data)
+    if not serializer.is_valid():
+        # Если данные кривые (например, 15 цифр в карте), возвращаем ошибку ДО обращения к БД
+        error_details = serializer.errors
+        logger.error(f"Validation failed: {error_details}")
+        return RPCError(32706, f"Validation error: {error_details}")
+
+    # Если всё ОК, берем чистые, проверенные данные
+    clean_data = serializer.validated_data
 
     try:
         if Transfer.objects.filter(ext_id=ext_id).exists():
