@@ -15,12 +15,14 @@ ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "*").split(",")
 
 
 INSTALLED_APPS = [
+    "corsheaders",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "rest_framework",
     "app",
     "jsonrpcserver",
     "import_export",
@@ -34,6 +36,7 @@ AUTH_USER_MODEL = "app.User"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    'corsheaders.middleware.CorsMiddleware',
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -43,6 +46,12 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "config.urls"
+
+CORS_ALLOWED_ORIGIN = [
+    "https://frontends.com",
+    "https://localhost:8000",
+    "https://localhost:3000",
+]
 
 TEMPLATES = [
     {
@@ -176,15 +185,31 @@ CELERY_RESULT_BACKEND = f"{REDIS_URL}/0"
 CELERY_TIMEZONE = "UTC"
 CELERY_TASK_TRACK_STARTED = True
 
-from celery.schedules import crontab
-CELERY_BEAT_SCHEDULE = {
-    "hourly-stats": {
-        "task": "app.tasks.send_stats_report",
-        "schedule": crontab(minute=0),         
+
+
+
+logging = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "file": {
+            "level": "INFO",
+            "class": "logging.FileHandler",
+            "filename": os.path.join(BASE_DIR, "logs/rpc.log"),
+            "formatter": "verbose",
+        },
     },
-    "daily-stats": {
-        "task": "app.tasks.send_stats_report",
-        "schedule": crontab(hour=9, minute=0), 
+    "loggers": {
+        "app.decorators": {
+            "handlers": ["file", "console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    "app.views": {
+            "handlers": ["file", "console"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
 }
 import os

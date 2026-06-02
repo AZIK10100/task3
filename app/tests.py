@@ -20,7 +20,7 @@ class TransferRpcTests(TestCase):
         cls.sender_card = Card.objects.create(
             card_number=cls.sender_card_number,
             phone="+998901234567",
-            balance=Decimal("50000.00"),
+            balance=Decimal("5000000.00"),
             status=StatusChoices.ACTIVE,
             expire_date=timezone.datetime(2026, 12, 1).date(),
         )

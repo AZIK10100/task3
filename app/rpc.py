@@ -1,7 +1,9 @@
+import json
 import logging
 from datetime import date
 from decimal import Decimal
 
+from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -38,6 +40,34 @@ ALLOWED_CURRENCIES = {643, 840, 860}
 MAX_OTP_TRIES = 3
 MIN_TRANSFER_AMOUNT = Decimal("1.00")
 MAX_TRANSFER_AMOUNT = Decimal("1000000000.00")
+CARD_INFO_CACHE_TTL = 30
+ERROR_MESSAGE_CACHE_TTL = 300
+CACHE_UNAVAILABLE = False
+from jsonrpcserver import method, Result, Success, Error as RPCError
+from .serializers import TransferCreateSerializer
+
+
+def safe_cache_get(key):
+    global CACHE_UNAVAILABLE
+    if CACHE_UNAVAILABLE:
+        return None
+    try:
+        return cache.get(key)
+    except Exception:
+        CACHE_UNAVAILABLE = True
+        logger.warning("cache unavailable, falling back to ORM key=%s", key)
+        return None
+
+
+def safe_cache_set(key, value, timeout):
+    global CACHE_UNAVAILABLE
+    if CACHE_UNAVAILABLE:
+        return
+    try:
+        cache.set(key, value, timeout=timeout)
+    except Exception:
+        CACHE_UNAVAILABLE = True
+        logger.warning("cache unavailable, skip set key=%s", key)
 
 
 def normalize_lang(lang):
@@ -47,9 +77,13 @@ def normalize_lang(lang):
 
 def get_error_message(code, lang="uz", **context):
     language = normalize_lang(lang)
+    cache_key = f"error_message:{code}:{language}"
+    template = safe_cache_get(cache_key)
 
-    error = Error.objects.only("en", "ru", "uz").get(code=code)
-    template = getattr(error, language)
+    if template is None:
+        error = Error.objects.only("en", "ru", "uz").get(code=code)
+        template = getattr(error, language)
+        safe_cache_set(cache_key, template, ERROR_MESSAGE_CACHE_TTL)
 
     try:
         return template.format(**context)
@@ -182,8 +216,58 @@ def transfer_create(
     currency,
     lang="uz",
 ):
+    """
+    Create a new transfer transaction.
+
+    This method validates sender and receiver cards,
+    checks balance and currency, generates OTP,
+    creates transfer record, and sends confirmation message.
+
+    Args:
+        ext_id (str): External unique transfer identifier.
+        sender_card_number (str): Sender card number.
+        sender_card_expiry (str): Sender card expiry date.
+        receiver_card_number (str): Receiver card number.
+        sending_amount (Decimal | int | float): Transfer amount.
+        currency (int): Currency code.
+        lang (str, optional): Response language. Defaults to 'uz'.
+
+    Returns:
+        Success: Transfer creation result with transfer state.
+        RpcError: Validation or processing error.
+
+    Example:
+        transfer.create(
+            ext_id='12345',
+            sender_card_number='8600123412341234',
+            sender_card_expiry='12/27',
+            receiver_card_number='9860123412341234',
+            sending_amount=10000,
+            currency=860
+        )
+    """
     language = normalize_lang(lang)
     logger.info("transfer.create ext_id=%s", ext_id)
+
+    data = {
+        "ext_id": ext_id,
+        "sender_card_number": sender_card_number,
+        "receiver_card_number": receiver_card_number,
+        "sender_card_expiry": sender_card_expiry,
+        "sending_amount": sending_amount,
+        "currency": currency
+    }
+
+    # ФЕЙСКОНТРОЛЬ (Пропускаем через сериализатор)
+    serializer = TransferCreateSerializer(data=data)
+    if not serializer.is_valid():
+        # Если данные кривые (например, 15 цифр в карте), возвращаем ошибку ДО обращения к БД
+        error_details = serializer.errors
+        logger.error(f"Validation failed: {error_details}")
+        return RPCError(32706, f"Validation error: {error_details}")
+
+    # Если всё ОК, берем чистые, проверенные данные
+    clean_data = serializer.validated_data
 
     try:
         if Transfer.objects.filter(ext_id=ext_id).exists():
@@ -250,6 +334,27 @@ def transfer_create(
 @method(name="transfer.confirm")
 @log_rpc_method
 def transfer_confirm(ext_id, otp, lang="uz"):
+    """
+    Confirm an existing transfer using OTP code.
+
+    This method validates OTP code, checks transfer state,
+    updates balances, and marks transfer as confirmed.
+
+    Args:
+        ext_id (str): External transfer identifier.
+        otp (str | int): One-time confirmation password.
+        lang (str, optional): Response language. Defaults to 'uz'.
+
+    Returns:
+        Success: Confirmed transfer information.
+        RpcError: Confirmation or validation error.
+
+    Example:
+        transfer.confirm(
+            ext_id='12345',
+            otp='5432'
+        )
+    """
     language = normalize_lang(lang)
     logger.info("transfer.confirm ext_id=%s", ext_id)
 
@@ -337,6 +442,9 @@ def transfer_confirm(ext_id, otp, lang="uz"):
             sender_card.balance -= amount_to_deduct
             sender_card.save(update_fields=["balance"])
 
+            spent_amount = amount_to_deduct
+            remaining_balance = sender_card.balance
+
             # Receiver ga ham so'mda qo'shish (barcha kartalar so'mda)
             receiver_card.balance += amount_to_deduct
             receiver_card.save(update_fields=["balance"])
@@ -346,7 +454,30 @@ def transfer_confirm(ext_id, otp, lang="uz"):
             transfer.otp = None
             transfer.save(update_fields=["state", "confirmed_at", "otp", "updated_at"])
 
-        return Success({"ext_id": transfer.ext_id, "state": transfer.state})
+        balance_message = localize_message(
+            f"Transfer tasdiqlandi!\n\n"
+            f"Yuborilgan summa: {spent_amount:,.2f} so'm\n"
+            f"Qoldiq balans: {remaining_balance:,.2f} so'm",
+
+            f"Перевод подтверждён!\n\n"
+            f"Потраченная сумма: {spent_amount:,.2f} сум\n"
+            f"Остаток баланса: {remaining_balance:,.2f} сум"
+            f"Transfer confirmed!\n\n"
+            
+            f"Spent amount: {spent_amount:,.2f} sum\n"
+            f"Remaining balance: {remaining_balance:,.2f} sum",
+
+            language,
+        )
+        send_telegram_message(sender_card.phone, balance_message)
+
+        return Success({
+            "ext_id": transfer.ext_id,
+            "state": transfer.state,
+            "spent_amount": float(spent_amount),
+            "remaining_balance": float(remaining_balance),
+        })
+
     except Exception:
         logger.exception("transfer.confirm failed ext_id=%s", ext_id)
         return rpc_error(32706, language)
@@ -355,6 +486,25 @@ def transfer_confirm(ext_id, otp, lang="uz"):
 @method(name="transfer.cancel")
 @log_rpc_method
 def transfer_cancel(ext_id, lang="uz"):
+    """
+    Cancel a created transfer.
+
+    This method changes transfer state to CANCELLED
+    if transfer has not been confirmed yet.
+
+    Args:
+        ext_id (str): External transfer identifier.
+        lang (str, optional): Response language. Defaults to 'uz'.
+
+    Returns:
+        Success: Cancelled transfer information.
+        RpcError: Validation or state error.
+
+    Example:
+        transfer.cancel(
+            ext_id='12345'
+        )
+    """
     language = normalize_lang(lang)
     logger.info("transfer.cancel ext_id=%s", ext_id)
 
@@ -474,13 +624,6 @@ def transfer_history(
         logger.exception("transfer.history failed")
         return rpc_error(32706, language)
 
-# ABDUVORIS ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
-import json
-from django.core.cache import cache
-
-CARD_INFO_CACHE_TTL = 30  # 30 секунд
-
-
 def mask_card(card_number: str) -> str:
     """
     8600121234561234  →  860012******1234
@@ -493,13 +636,35 @@ def mask_card(card_number: str) -> str:
 
 @method(name="card.info")
 def card_info(card_number, expiry, lang="uz"):
+    """
+    Retrieve payment card information.
+
+    This method validates card number and expiry date,
+    checks cache storage, and returns card details
+    including masked card number and balance.
+
+    Args:
+        card_number (str): Full card number.
+        expiry (str): Card expiry date.
+        lang (str, optional): Response language. Defaults to 'uz'.
+
+    Returns:
+        Success: Card information response.
+        RpcError: Card validation or lookup error.
+
+    Example:
+        card.info(
+            card_number='8600123412341234',
+            expiry='12/27'
+        )
+    """
     language = normalize_lang(lang)
 
     # --- Уникальный ключ для каждой карты ---
     cache_key = f"card_info:{card_number}:{expiry}"
 
     # --- Шаг 1: смотрим в Redis ---
-    cached = cache.get(cache_key)
+    cached = safe_cache_get(cache_key)
     if cached:
         data = json.loads(cached)
         if data.get("error"):
@@ -514,7 +679,7 @@ def card_info(card_number, expiry, lang="uz"):
     except ValueError:
         # Кэшируем ошибку тоже!
         error_data = {"error": True, "code": 32704}
-        cache.set(cache_key, json.dumps(error_data), timeout=CARD_INFO_CACHE_TTL)
+        safe_cache_set(cache_key, json.dumps(error_data), CARD_INFO_CACHE_TTL)
         return rpc_error(32704, language)
 
     # --- Шаг 3: ORM запрос к БД ---
@@ -525,13 +690,13 @@ def card_info(card_number, expiry, lang="uz"):
     if not card:
         # Карта не найдена — кэшируем ошибку
         error_data = {"error": True, "code": 32706}
-        cache.set(cache_key, json.dumps(error_data), timeout=CARD_INFO_CACHE_TTL)
+        safe_cache_set(cache_key, json.dumps(error_data), CARD_INFO_CACHE_TTL)
         return rpc_error(32706, language)
 
     if not expiry_matches(card.expire_date, parsed_expiry):
         # Срок не совпадает — кэшируем ошибку
         error_data = {"error": True, "code": 32704}
-        cache.set(cache_key, json.dumps(error_data), timeout=CARD_INFO_CACHE_TTL)
+        safe_cache_set(cache_key, json.dumps(error_data), CARD_INFO_CACHE_TTL)
         return rpc_error(32704, language)
 
     # --- Шаг 4: формируем ответ ---
@@ -544,6 +709,7 @@ def card_info(card_number, expiry, lang="uz"):
     }
 
     # --- Шаг 5: кэшируем успех на 30 секунд ---
-    cache.set(cache_key, json.dumps(response_data), timeout=CARD_INFO_CACHE_TTL)
+    safe_cache_set(cache_key, json.dumps(response_data), CARD_INFO_CACHE_TTL)
 
     return Success(response_data)
+    

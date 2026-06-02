@@ -15,3 +15,4 @@ def send_stats_report():
     else:
 
         pass
+#127.0.0.1:6379
