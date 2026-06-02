@@ -96,6 +96,60 @@ USE_TZ = True
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+
+# Security / production settings
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", SECRET_KEY)
+DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+    if host.strip()
+]
+
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY", "")
+ADMIN_ALLOWED_IPS = [
+    ip.strip()
+    for ip in os.getenv("ADMIN_ALLOWED_IPS", "127.0.0.1,::1").split(",")
+    if ip.strip()
+]
+
+REQUEST_SIGNATURE_EXEMPT_PREFIXES = (
+    "/admin/",
+    "/static/",
+    "/media/",
+)
+
+MIDDLEWARE = [
+    "app.middleware.AdminIPRestrictionMiddleware",
+    *MIDDLEWARE,
+    "app.middleware.RequestSignatureMiddleware",
+]
+
+LOGGING = globals().get(
+    "LOGGING",
+    {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+            },
+        },
+        "root": {
+            "handlers": ["console"],
+            "level": "INFO",
+        },
+    },
+)
+LOGGING.setdefault("filters", {})["sensitive_data"] = {
+    "()": "app.security.SensitiveDataFilter",
+}
+for handler in LOGGING.get("handlers", {}).values():
+    filters = handler.setdefault("filters", [])
+    if "sensitive_data" not in filters:
+        filters.append("sensitive_data")
+
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
@@ -133,3 +187,8 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": crontab(hour=9, minute=0), 
     },
 }
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
