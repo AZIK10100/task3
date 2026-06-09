@@ -293,3 +293,6 @@ def send_telegram_message(phone, message, chat_id=None):
         logger.error("ADMIN_TELEGRAM_ID is not configured in settings")
         return False
     return send_message(message, admin_chat_id)
+
+
+
