@@ -29,3 +29,4 @@ for i in range(1, 8):
     time.sleep(0.5)
 
 print("✅ ТЕСТ ЗАВЕРШЕН!")
+#test
