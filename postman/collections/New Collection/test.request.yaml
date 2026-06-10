@@ -1,0 +1,36 @@
+$kind: http-request
+name: test
+url: http://127.0.0.1:8000/rpc/
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \  \"jsonrpc\": \"2.0\",\r
+
+    \  \"method\": \"transfer.create\",\r
+
+    \  \"params\": {\r
+
+    \    \"phone_number\": \"90 043 04 74\",\r
+
+    \    \"sender_card_number\": \"4242424242424242\",\r
+
+    \    \"receiver_card_number\": \"8600456776541234\",\r
+
+    \    \"sending_amount\": 100,\r
+
+    \    \"currency\": 643,\r
+
+    \    \"sender_card_expiry\": \"12/30\",\r
+
+    \r
+
+    \    \"ext_id\":\"t33a45t632\"\r
+
+    \  },\r
+
+    \ \"id\": 5\r
+
+    }"
+order: 1781002944271

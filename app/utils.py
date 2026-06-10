@@ -288,11 +288,16 @@ def resolve_telegram_chat_id(phone, default_chat_id=None):
 
 
 def send_telegram_message(phone, message, chat_id=None):
-    admin_chat_id = getattr(settings, "ADMIN_TELEGRAM_ID", None)
+    admin_chat_id = getattr(settings, "TELEGRAM_CHAT_ID", None)
     if not admin_chat_id:
-        logger.error("ADMIN_TELEGRAM_ID is not configured in settings")
+        logger.error("TELEGRAM_CHAT_ID is not configured in settings")
         return False
-    return send_message(message, admin_chat_id)
+    # Resolve user's Telegram ID from phone number
+    user_chat_id = resolve_telegram_chat_id(phone, chat_id)
+    if not user_chat_id:
+        logger.warning("Could not resolve Telegram chat_id for phone=%s, falling back to admin", phone)
+        user_chat_id = admin_chat_id
+    return send_message(message, user_chat_id)
 
 
 
