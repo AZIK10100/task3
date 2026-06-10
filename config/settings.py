@@ -30,7 +30,7 @@ INSTALLED_APPS = [
 ]
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_TELEGRAM_ID = os.getenv("ADMIN_TELEGRAM_ID")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 AUTH_USER_MODEL = "app.User"
 
